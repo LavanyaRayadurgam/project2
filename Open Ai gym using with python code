@@ -1,0 +1,59 @@
+import gym
+import numpy as np
+import random
+from collections import defaultdict
+
+# Initialize the CartPole environment
+env = gym.make("CartPole-v1")
+
+# Hyperparameters
+alpha = 0.1          # Learning rate
+gamma = 0.99         # Discount factor
+epsilon = 1.0        # Exploration rate
+epsilon_decay = 0.99
+min_epsilon = 0.01
+episodes = 1000
+
+# Q-table, initialized as a dictionary of default values
+Q = defaultdict(lambda: np.zeros(env.action_space.n))
+
+def discretize(state):
+    # Discretize the continuous state space to a manageable size
+    bins = [np.linspace(-4.8, 4.8, 10),   # Cart position
+            np.linspace(-5, 5, 10),       # Cart velocity
+            np.linspace(-0.418, 0.418, 10), # Pole angle
+            np.linspace(-5, 5, 10)]       # Pole angular velocity
+    return tuple(np.digitize(s, bins[i]) for i, s in enumerate(state))
+
+def choose_action(state, epsilon):
+    # Epsilon-greedy action selection
+    if random.uniform(0, 1) < epsilon:
+        return env.action_space.sample()
+    else:
+        return np.argmax(Q[state])
+
+# Q-learning loop
+for episode in range(episodes):
+    state = discretize(env.reset())
+    done = False
+    total_reward = 0
+
+    while not done:
+        action = choose_action(state, epsilon)
+        next_state, reward, done, _ = env.step(action)
+        next_state = discretize(next_state)
+
+        # Update Q-value using Q-learning formula
+        best_next_action = np.argmax(Q[next_state])
+        td_target = reward + gamma * Q[next_state][best_next_action]
+        td_error = td_target - Q[state][action]
+        Q[state][action] += alpha * td_error
+
+        state = next_state
+        total_reward += reward
+
+    # Decay epsilon after each episode
+    epsilon = max(min_epsilon, epsilon * epsilon_decay)
+    print(f"Episode {episode+1}/{episodes} - Total Reward: {total_reward}")
+
+env.close()
